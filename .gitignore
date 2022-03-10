@@ -1,0 +1,10 @@
+Atmosphere_models/
+!Atmosphere_models/Transmission-HD189733-CO-H2O.txt
+
+
+Notebooks/
+Input_files/PhoenixGridSpecInt/
+Input_files/PhoenixGrid/*
+Input_files /NexaComposite
+Simulations/
+__pycache__

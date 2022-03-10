@@ -1,0 +1,18 @@
+nexa: Input_files/NexaComposite.csv
+phoenixgrid: Input_files/PhoenixGrid
+
+hotjupiter_transmission: Atmosphere_models/Transmission-HD189733-CO-H2O.txt
+hotjupiter_emission: Atmosphere_models/Template_H2O_CO_CRIRES/H2O_emission_spec.dat
+venus_transmission: Atmosphere_models/Transmission-Venus-nocloud-240K-CO2-CO.txt
+gj1214_transmission: Atmosphere_models/GJ1214-tran-CH4-CO-H2O-cloud1e-5.txt
+earth_transmission: Atmosphere_models/Earth-transmisison-CO2-CH4-H2O.txt
+
+transitlist: Input_files/AllTransit_Crires_newSNR_v2.csv
+eclipselist: Input_files/AllEmission_Comparison.csv
+limbdark_coeff: Input_files/LimbDarkeningClaret.tsv
+
+telluric: Input_files/stdAtmos_crires_airmass1.fits
+
+detector_wl: Input_files/crires_wlminmax_cooldown13.txt
+blaze_wl: Input_files/crires_wlcoeffs_cooldown13.txt
+blaze_coeff: Input_files/crires_blazecoeffs_cooldown13.txt
