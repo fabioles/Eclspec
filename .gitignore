@@ -7,4 +7,5 @@ Input_files/PhoenixGridSpecInt/
 Input_files/PhoenixGrid/*
 Input_files /NexaComposite
 Simulations/
+Comparison_Ansgars_CC/
 __pycache__

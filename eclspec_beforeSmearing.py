@@ -308,8 +308,7 @@ class System:
     '''
     Class for holding information about planet and its host star
     '''
-    def __init__(self, name, pathfile, atmosphere_type='hotjupiter',
-                 obs_type = 'transmission', injectionStrength = 1):
+    def __init__(self, name, pathfile, atmosphere_type='hotjupiter', obs_type = 'transmission'):
 
         self.name = name
         self.transits = None
@@ -330,7 +329,7 @@ class System:
         self.GetPlanetData(self.paths['nexa'])
         
         #Read stellar and planetary spectra
-        self.GetPlanetSpectrum(injectionStrength)
+        self.GetPlanetSpectrum()
         self.GetStellarSpectrum()
         
         #Set up keplarian orbits
@@ -414,7 +413,7 @@ class System:
 
         return H   
     
-    def GetPlanetSpectrum(self, injectionStrength):
+    def GetPlanetSpectrum(self):
         '''
         Load model spectrum for planet
         '''
@@ -463,8 +462,7 @@ class System:
 
             H_lambda *= scalefactor
 
-            self.spectrum_p = H_lambda * injectionStrength + self.Rp
-            print(str(injectionStrength) +' times injected')
+            self.spectrum_p = H_lambda + self.Rp
             
         elif self.obs_type == 'emission':
             self.wavelength_p = spectrum_pl.Wavelength * 10**8
@@ -728,7 +726,7 @@ class Observation:
 
         self.ld_coeff = ldc.loc[chosen_index[0]]
 
-    def Observe(self, nr, savepath = None, N_per_exposure = 1):
+    def Observe(self, nr, savepath = None):
         if len(self.opportunities)-1 < nr:
             raise Exception('Opportunity not found. Try an index between 0 and {}.'.format(len(self.opportunities)-1))
         
@@ -744,7 +742,6 @@ class Observation:
         else:
             raise Exception('For this spectral band no SNR estimation is available.')
         
-        exposure_divided = self.exposure_time / N_per_exposure
         #Set up times
         if self.planet.obs_type == 'transmission':
             #desired out of transit observation time: 1h for short transits, 0.5Tdur for long transits
@@ -768,18 +765,7 @@ class Observation:
 
             #Shift so that the observation starts at a random time around obs_start
             t += np.random.rand()*self.timestep
-            
-            # Divide each exposure into N_per_exposure chunks to account for smearing
-            t_divided = []
-            for time in t:
-                for i in range(N_per_exposure):
-                    t_divided.append(time + i * exposure_divided)
-            t_divided = np.array(t_divided)
-            t_rel = t_divided - tmid + exposure_divided
-            n_divided = len(t_divided)
-            
-            # Convert from start of exposure to mid-exposure
-            t += self.exposure_time / 2
+            t_rel = t - tmid
 
             #Concrete orbit of planet
             #advance the orbit such that t=0 faces us for any omega
@@ -796,20 +782,7 @@ class Observation:
 
             #Shift so that the observation starts at a random time around obs_start
             t += np.random.rand()*self.timestep
-            
-            
-            # Divide each exposure into N_per_exposure chunks to account for smearing
-            t_divided = []
-            for time in t:
-                for i in range(N_per_exposure):
-                    t_divided.append(time + i * exposure_divided)
-            t_divided = np.array(t_divided)
-            
-            t_rel = t_divided - tmid + exposure_divided
-            n_divided = len(t_divided)
-            
-            # Convert from start of exposure to mid-exposure
-            t += self.exposure_time / 2
+            t_rel = t - tmid
 
             #Concrete orbit of planet
             #advance the orbit such that t=0 faces us for any omega
@@ -840,21 +813,15 @@ class Observation:
                np.sin(self.planet.Inc/180*np.pi))
         
         #compute altitude of star at each time
-        altaz_divided = pyasl.eq2hor(t_divided, np.ones(n_divided) * self.planet.Ra,
-                             np.ones(n_divided) * self.planet.Dec,
-                             lon=self.lon, lat=self.lat,alt=self.alt)
-        altitude_divided = altaz_divided[0]
-        altaz = pyasl.eq2hor(t, np.ones(n) * self.planet.Ra,
-                             np.ones(n) * self.planet.Dec,
-                             lon=self.lon, lat=self.lat,alt=self.alt)
+        altaz = pyasl.eq2hor(t, np.ones(t.size) * self.planet.Ra, np.ones(t.size) * self.planet.Dec,
+                                      lon=self.lon, lat=self.lat,alt=self.alt)
         altitude = altaz[0]
-        
+
         #calculate airmass with plane parallel approx.
         airm = pyasl.airmassPP(90-altitude)
-        airm_divided = pyasl.airmassPP(90-altitude_divided)
 
         #compute lightcurve
-        lightcurve = np.ones(n_divided)
+        lightcurve = np.ones(n)
         r = np.sqrt(pos_pl[0]**2 + pos_pl[1]**2)
 
         intersect_pl_st = IntersectArea(1, self.planet.Rp, r) #area of planet in front of star
@@ -889,7 +856,7 @@ class Observation:
         self.lightcurve = lightcurve
         
         #relative amount of planetary disk area visible (not oculted by star)
-        planetdiskVisible = np.ones(n_divided)
+        planetdiskVisible = np.ones(n)
         planetdiskVisible[planetBehindStar] -= intersect_pl_st[planetBehindStar] / (self.planet.Rp**2*np.pi)
         
         #fraction of planetary disk that is in front of stellar disk
@@ -898,24 +865,24 @@ class Observation:
     
         ###Calculate barycentric redshift
         v_bary = np.array([pyasl.helcorr(self.lon, self.lat, self.alt, self.planet.Ra, self.planet.Dec, time)[0] for time in t])
-        v_bary_divided = np.array([pyasl.helcorr(self.lon, self.lat, self.alt, self.planet.Ra, self.planet.Dec, time)[0] for time in t_divided])
 
         #v_bary is positive if the earth moves towards the star, so it has to be subtracted
-        v_total = -v_bary_divided + self.planet.RadVelStar
+        v_total = -v_bary + self.planet.RadVelStar
 
         if abs(np.mean(v_total)) < 2:
             print('Warning: the total velocity difference between system and observer is only {} km/s!'.format(round(np.mean(v_total),2)))
             
         ###Add redshift due to stars motion around barycenter and barycentric velocity
-        spectrum_s_shift = np.ones([n_divided, len(self.spectrum_s)])
-        for i in range(n_divided):
+        spectrum_s_shift = np.ones([n, len(self.spectrum_s)])
+        for i in range(n):
             spectrum_s_shift[i,:] = np.interp(self.wavelength_s, (1 + (v_total[i]+rv_st[i])/c)*self.wavelength_s, self.spectrum_s)
             
         ###Add redshift due to planets motion around barycenter and barycentric velocity,
         #and resample to wl grid of stellar spectrum
-        spectrum_p_shift = np.ones([n_divided, len(self.spectrum_s)])
-        for i in range(n_divided):
+        spectrum_p_shift = np.ones([n, len(self.spectrum_s)])
+        for i in range(n):
             spectrum_p_shift[i,:] = np.interp(self.wavelength_s, (1 + (v_total[i]+rv_pl[i])/c)*self.wavelength_p, self.spectrum_p)
+            
             
         if self.planet.obs_type == 'transmission':
             #calculate eclipsed spectrum of stellar region behind planet
@@ -924,7 +891,7 @@ class Observation:
 
             #compute Doppler velocity (from stellar rotation) and shift stellar spectrum
             vproj = pos_pl[0] * self.planet.Vsini
-            for i in range(n_divided):
+            for i in range(n):
                 spectrum_ecl[i,:] = np.interp(self.wavelength_s, (1 + vproj[i]/c)*self.wavelength_s, spectrum_ecl[i,:])
 
                 
@@ -933,20 +900,20 @@ class Observation:
             #which is a radius ratio
             #np.pi/ti acounts for the difference in limbdarkening (mean LD of entire stellar disk)
             #spectrum_p_shift is the radius ratio
-            spectrum_comb_divided = spectrum_s_shift - spectrum_ecl * np.pi/self.total_int * spectrum_p_shift**2
+            spectrum_comb = spectrum_s_shift - spectrum_ecl * np.pi/self.total_int * spectrum_p_shift**2
             
         elif self.planet.obs_type == 'emission':
             #scale with total iluminated area and hide planet behind star
             planet_emission = np.pi * spectrum_p_shift * self.planet.Rp**2 * planetdiskVisible[:, None]
 
             #scale with sin to account for day/night side
-            planet_emission *= ((np.sin(2*np.pi/self.planet.Period * (t_divided-t_ecl) + 1/2*np.pi)+1)*0.5)[:, None]
+            planet_emission *= ((np.sin(2*np.pi/self.planet.Period * (t-t_ecl) + 1/2*np.pi)+1)*0.5)[:, None]
 
             #add planetary emission to stellar spectrum
-            spectrum_comb_divided = spectrum_s_shift + planet_emission
+            spectrum_comb = spectrum_s_shift + planet_emission
             
         #apply extinction
-        spectrum_comb_divided *= np.dot(10**(-self.extcof/2.5 * (airm_divided))[:, None], np.ones(self.wavelength_s.size)[None, :])
+        spectrum_comb *= np.dot(10**(-self.extcof/2.5 * (airm))[:, None], np.ones(self.wavelength_s.size)[None, :])
 
         
         #compute telluric spectra
@@ -957,21 +924,13 @@ class Observation:
 #             telluric_array[i,:] = np.interp(self.wavelength_s, self.wavelength_tell, telluric_amplified)
             
         #new way
-        telluric_array = np.zeros([n_divided, self.wavelength_s.size])
+        telluric_array = np.zeros([n, self.wavelength_s.size])
         telluric_resample = np.interp(self.wavelength_s, self.wavelength_tell, self.spectrum_tell)
-        for i in range(n_divided):
-            telluric_array[i,:] = Mag_spectrum(telluric_resample, airm_divided[i])
+        for i in range(n):
+            telluric_array[i,:] = Mag_spectrum(telluric_resample, airm[i])
 
         #apply telluric atmosphere
-        spectrum_comb_divided *= telluric_array
-        
-        # combine all sub-exposures
-        spectrum_comb = np.ones([n, len(self.spectrum_s)])
-        for i in range(n):
-            spectrum_comb[i] = np.mean(spectrum_comb_divided[i * N_per_exposure:
-                                                             (i+1) * N_per_exposure],
-                                       axis = 0)
-        
+        spectrum_comb *= telluric_array
         
         #instrument broadening
         spectrum_comb = Instrbrod(self.wavelength_s, spectrum_comb, self.resolution)

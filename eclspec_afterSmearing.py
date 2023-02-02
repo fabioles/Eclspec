@@ -308,8 +308,7 @@ class System:
     '''
     Class for holding information about planet and its host star
     '''
-    def __init__(self, name, pathfile, atmosphere_type='hotjupiter',
-                 obs_type = 'transmission', injectionStrength = 1):
+    def __init__(self, name, pathfile, atmosphere_type='hotjupiter', obs_type = 'transmission'):
 
         self.name = name
         self.transits = None
@@ -330,7 +329,7 @@ class System:
         self.GetPlanetData(self.paths['nexa'])
         
         #Read stellar and planetary spectra
-        self.GetPlanetSpectrum(injectionStrength)
+        self.GetPlanetSpectrum()
         self.GetStellarSpectrum()
         
         #Set up keplarian orbits
@@ -414,7 +413,7 @@ class System:
 
         return H   
     
-    def GetPlanetSpectrum(self, injectionStrength):
+    def GetPlanetSpectrum(self):
         '''
         Load model spectrum for planet
         '''
@@ -463,8 +462,7 @@ class System:
 
             H_lambda *= scalefactor
 
-            self.spectrum_p = H_lambda * injectionStrength + self.Rp
-            print(str(injectionStrength) +' times injected')
+            self.spectrum_p = H_lambda + self.Rp
             
         elif self.obs_type == 'emission':
             self.wavelength_p = spectrum_pl.Wavelength * 10**8
@@ -948,7 +946,6 @@ class Observation:
         #apply extinction
         spectrum_comb_divided *= np.dot(10**(-self.extcof/2.5 * (airm_divided))[:, None], np.ones(self.wavelength_s.size)[None, :])
 
-        
         #compute telluric spectra
 #        #old way
 #         telluric_array = np.zeros([n, self.wavelength_s.size])
