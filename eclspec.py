@@ -769,18 +769,21 @@ class Observation:
             #Shift so that the observation starts at a random time around obs_start
             t += np.random.rand()*self.timestep
             
+            
             # Divide each exposure into N_per_exposure chunks to account for smearing
             t_divided = []
             for time in t:
                 for i in range(N_per_exposure):
                     t_divided.append(time + i * exposure_divided)
             t_divided = np.array(t_divided)
-            t_rel = t_divided - tmid + exposure_divided
-            n_divided = len(t_divided)
             
             # Convert from start of exposure to mid-exposure
             t += self.exposure_time / 2
-
+            t_divided += exposure_divided / 2
+            
+            t_rel = t_divided - tmid
+            n_divided = len(t_divided)
+            
             #Concrete orbit of planet
             #advance the orbit such that t=0 faces us for any omega
             omega = 0 #argument of periapsis, can be changed in the future
